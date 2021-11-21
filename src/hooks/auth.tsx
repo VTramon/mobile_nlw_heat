@@ -42,12 +42,11 @@ type AuthorizationResponse = {
 export const AuthContext = createContext({} as AuthContextData);
 
 function AuthProvider({ children }: AuthProviderProps) {
-  const [isSigning, setIsSigning] = useState(false);
+  const [isSigning, setIsSigning] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
   async function signIn() {
     try {
-      setIsSigning(true);
       const authUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&scope=${SCOPE}`;
       const authSessionResponse = (await AuthSessions.startAsync({
         authUrl,
@@ -57,7 +56,7 @@ function AuthProvider({ children }: AuthProviderProps) {
         authSessionResponse.type === 'success' &&
         authSessionResponse.params.error !== 'access_denied'
       ) {
-        const authResponse = await api.post('/authenticate', {
+        const authResponse = await api.post('/authenticate/mobile', {
           code: authSessionResponse.params.code,
         });
         const { user, token } = authResponse.data as AuthResponse;
@@ -73,22 +72,26 @@ function AuthProvider({ children }: AuthProviderProps) {
       setIsSigning(false);
     }
   }
-  async function signOut() {}
+  async function signOut() {
+    setUser(null);
+    await AsyncStorage.removeItem(USER_STORAGE);
+    await AsyncStorage.removeItem(TOKEN_STORAGE);
+  }
 
   useEffect(() => {
     async function loadUserStorageData() {
-      setIsSigning(true);
       const userStorage = await AsyncStorage.getItem(USER_STORAGE);
       const tokenStorage = await AsyncStorage.getItem(TOKEN_STORAGE);
 
       if (userStorage && tokenStorage) {
         api.defaults.headers.common['authorization'] = `Bearer ${tokenStorage}`;
         setUser(JSON.parse(userStorage));
-        setIsSigning(false);
+        // setIsSigning(false);
       }
+      setIsSigning(false);
     }
 
-    loadUserStorageData;
+    loadUserStorageData();
   }, []);
 
   return (
